@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Screen Time vs Happiness Correlation</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    .tooltip {
+      position: absolute;
+      background: white;
+      border: 1px solid #333;
+      padding: 5px;
+      font-size: 12px;
+      pointer-events: none;
+      opacity: 0;
+    }
+    .axis-label {
+      font-size: 14px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Correlation between Screen Time and Happiness Score</h2>
+  <svg width="800" height="600"></svg>
+  <div class="tooltip"></div>
+
+  <script>
+    const margin = { top: 40, right: 30, bottom: 50, left: 60 };
+    const width = 800 - margin.left - margin.right;
+    const height = 600 - margin.top - margin.bottom;
+
+    const svg = d3.select("svg")
+      .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const tooltip = d3.select(".tooltip");
+
+    d3.csv("final_data_with_iso.csv").then(data => {
+      data.forEach(d => {
+        d["Screen Time"] = +d["Screen Time"];
+        d["Happiness Score"] = +d["Happiness Score"];
+      });
+
+      const xScale = d3.scaleLinear()
+        .domain([d3.min(data, d => d["Screen Time"]) - 0.5, d3.max(data, d => d["Screen Time"]) + 0.5])
+        .range([0, width]);
+
+      const yScale = d3.scaleLinear()
+        .domain([d3.min(data, d => d["Happiness Score"]) - 0.5, d3.max(data, d => d["Happiness Score"]) + 0.5])
+        .range([height, 0]);
+
+      svg.append("g")
+        .attr("transform", `translate(0, ${height})`)
+        .call(d3.axisBottom(xScale).ticks(10));
+
+      svg.append("g")
+        .call(d3.axisLeft(yScale).ticks(10));
+
+      svg.append("text")
+        .attr("class", "axis-label")
+        .attr("x", width / 2)
+        .attr("y", height + 40)
+        .attr("text-anchor", "middle")
+        .text("Average Screen Time (Hours)");
+
+      svg.append("text")
+        .attr("class", "axis-label")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -height / 2)
+        .attr("y", -45)
+        .attr("text-anchor", "middle")
+        .text("Happiness Score");
+
+      svg.selectAll("circle")
+        .data(data)
+        .enter()
+        .append("circle")
+        .attr("cx", d => xScale(d["Screen Time"]))
+        .attr("cy", d => yScale(d["Happiness Score"]))
+        .attr("r", 6)
+        .attr("fill", "steelblue")
+        .attr("opacity", 0.8)
+        .on("mouseover", (event, d) => {
+          tooltip.style("opacity", 1)
+            .html(`<strong>${d.Country}</strong><br>Happiness: ${d["Happiness Score"]}<br>Screen Time: ${d["Screen Time"]} hrs`)
+            .style("left", (event.pageX + 10) + "px")
+            .style("top", (event.pageY - 20) + "px");
+        })
+        .on("mouseout", () => {
+          tooltip.style("opacity", 0);
+        });
+
+    });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Interactive Screen Time Radar Chart</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f7fa;
+            color: #2c3e50;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1400px;
+            /* Increased for better spacing */
+            margin: 20px auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h2.title {
+            text-align: center;
+            color: #34495e;
+            margin-top: -150px;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .main-content {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            gap: 40px;
+            /* Increased spacing */
+        }
+
+        .chart-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+        }
+
+        #radar-chart {
+            width: 100%;
+        }
+
+        .stats-panel {
+            flex: 1.5;
+            /* Increased width */
+            background-color: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+            /* More prominent shadow */
+            text-align: left;
+            min-width: 500px;
+            /* Increased */
+        }
+
+        .stats-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: #34495e;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 12px 0;
+            background: #ffffff;
+            padding: 10px;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-label {
+            color: #7f8c8d;
+            font-weight: bold;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #16a085;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            margin-top: -20px;
+            margin-bottom: 10px;
+            padding: 10px 20px;
+            gap: 15px;
+        }
+
+        .btn {
+            background-color: #3498db;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .btn.active {
+            background-color: #16a085;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 15px;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .legend-item:hover {
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            border-radius: 4px;
+        }
+
+        .stat-header {
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2 class="title">Interactive Screen Time Distribution</h2>
+
+        <div class="controls">
+            <button id="btn-show-all" class="btn active">Show All Months</button>
+            <button id="btn-compare" class="btn">Compare View</button>
+            <button id="btn-animate" class="btn">Play Animation</button>
+        </div>
+
+        <div class="main-content">
+            <div class="chart-container">
+                <div id="radar-chart"></div>
+
+                <div class="legend">
+                    <div class="legend-item" data-month="0">
+                        <div class="legend-color" style="background-color: #3498db;"></div>
+                        <div>January</div>
+                    </div>
+                    <div class="legend-item" data-month="1">
+                        <div class="legend-color" style="background-color: #2ecc71;"></div>
+                        <div>February</div>
+                    </div>
+                    <div class="legend-item" data-month="2">
+                        <div class="legend-color" style="background-color: #e74c3c;"></div>
+                        <div>March</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stats-panel">
+                <div class="stats-title">Monthly Insights</div>
+                <div id="stats-content">
+                    <div class="stat-row">
+                        <span class="stat-label">Select a month by double clicking on the the legend color to see
+                            detailed stats</span>
+                        <span class="stat-value"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Radar chart configuration
+        const config = {
+            width: 600,
+            height: 500,
+            margin: { top: 50, right: 50, bottom: 50, left: 50 },
+            maxValue: 16,
+            levels: 4,
+            roundStrokes: true,
+            colors: ["#3498db", "#2ecc71", "#e74c3c"],
+            monthNames: ["January", "February", "March"],
+            transitionDuration: 800
+        };
+
+        // Categories/dimensions
+        const categories = [
+            'Productivity', 'Healthcare', 'Social Media',
+            'Entertainment', 'Reading', 'Communication'
+        ];
+
+        // Load CSV file and process data
+        d3.csv("realistic_screen_time.csv").then(function (csvData) {
+            const categories = ["Productivity", "Healthcare", "Social Media", "Entertainment", "Reading", "Communication"];
+            const monthNames = ["January", "February", "March"];
+
+            // Organize data by month
+            const monthlyData = { "January": [], "February": [], "March": [] };
+            csvData.forEach(row => {
+                monthlyData[row.Month].push(row);
+            });
+
+            // Calculate average for each category per month
+            data = monthNames.map(month => {
+                let categoryAverages = categories.map(category => {
+                    let total = 0;
+                    let count = 0;
+
+                    monthlyData[month].forEach(week => {
+                        total += parseFloat(week[category]);  // Sum up weekly values
+                        count++;
+                    });
+
+                    return {
+                        axis: category,
+                        value: parseFloat((total / count).toFixed(1)) // Calculate average
+                    };
+                });
+
+                return categoryAverages;
+            });
+
+            console.log("Processed Data:", data); // Debugging - check the output structure
+
+            // Calculate statistics for each month
+            const calculateStats = (monthData) => {
+                const total = monthData.reduce((sum, item) => sum + item.value, 0);
+                const avg = total / monthData.length;
+                const highest = monthData.reduce((max, item) => item.value > max.value ? item : max, { value: -Infinity });
+                const lowest = monthData.reduce((min, item) => item.value < min.value ? item : min, { value: Infinity });
+
+                return {
+                    total,
+                    avg: avg.toFixed(1),
+                    highest,
+                    lowest,
+                    data: monthData
+                };
+            };
+            console.log(data)
+
+            const monthlyStats = data.map(calculateStats);
+
+            // Draw the radar chart
+            let svg, radarWrapper, tooltip;
+            function RadarChart(id, data, options) {
+                const cfg = {
+                    ...config,
+                    ...options
+                };
+
+                // Calculate actual dimensions
+                const width = cfg.width - cfg.margin.left - cfg.margin.right;
+                const height = cfg.height - cfg.margin.top - cfg.margin.bottom;
+                const radius = Math.min(width / 2, height / 2);
+
+                // Clear any existing chart
+                d3.select(id).select("svg").remove();
+
+                // Create the radar chart container
+                svg = d3.select(id).append("svg")
+                    .attr("width", cfg.width)
+                    .attr("height", cfg.height)
+                    .append("g")
+                    .attr("transform", `translate(${cfg.width / 2}, ${cfg.height / 2})`);
+
+                // Create tooltip if it doesn't exist
+                if (!tooltip) {
+                    tooltip = d3.select("body").append("div")
+                        .attr("class", "tooltip")
+                        .style("opacity", 0);
+                }
+
+                // Circular grid levels
+                const axisGrid = svg.append("g").attr("class", "axis-grid");
+
+                // Draw the circular grid levels with animation
+                for (let j = 0; j < cfg.levels; j++) {
+                    const levelFactor = radius * ((j + 1) / cfg.levels);
+
+                    // Build level circles with animation
+                    axisGrid.selectAll(".grid-circle-" + j)
+                        .data([j])
+                        .enter()
+                        .append("circle")
+                        .attr("class", "grid-circle grid-circle-" + j)
+                        .attr("r", 0)
+                        .style("fill", "none")
+                        .style("stroke", "#CDCDCD")
+                        .style("stroke-opacity", "0.5")
+                        .transition()
+                        .duration(cfg.transitionDuration)
+                        .delay(j * 100)
+                        .attr("r", radius / cfg.levels * (j + 1));
+
+                    // Add level values with animation
+                    axisGrid.selectAll(".axis-label-" + j)
+                        .data([j])
+                        .enter()
+                        .append("text")
+                        .attr("class", "axis-label axis-label-" + j)
+                        .attr("x", 4)
+                        .attr("y", -levelFactor + 4)
+                        .attr("dy", "0.4em")
+                        .style("font-size", "10px")
+                        .style("fill", "#737373")
+                        .style("opacity", 0)
+                        .text(Math.round(cfg.maxValue * (j + 1) / cfg.levels))
+                        .transition()
+                        .duration(cfg.transitionDuration)
+                        .delay(j * 100 + 300)
+                        .style("opacity", 1);
+                }
+
+                // Calculate angles for each axis
+                const angleSlice = Math.PI * 2 / categories.length;
+
+                // Create axis lines
+                const axis = axisGrid.selectAll(".axis")
+                    .data(categories)
+                    .enter()
+                    .append("g")
+                    .attr("class", "axis");
+
+                // Draw axis lines with animation
+                axis.append("line")
+                    .attr("x1", 0)
+                    .attr("y1", 0)
+                    .attr("x2", 0)
+                    .attr("y2", 0)
+                    .style("stroke", "#CDCDCD")
+                    .style("stroke-width", "1px")
+                    .transition()
+                    .duration(cfg.transitionDuration)
+                    .delay((d, i) => i * 50)
+                    .attr("x2", (d, i) => radius * Math.cos(angleSlice * i - Math.PI / 2))
+                    .attr("y2", (d, i) => radius * Math.sin(angleSlice * i - Math.PI / 2));
+
+                // Draw axis labels with animation
+                axis.append("text")
+                    .attr("class", "axis-text")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", "0.35em")
+                    .attr("x", (d, i) => (radius * 0.6) * Math.cos(angleSlice * i - Math.PI / 2))
+                    .attr("y", (d, i) => (radius * 0.6) * Math.sin(angleSlice * i - Math.PI / 2))
+                    .text(d => d)
+                    .style("font-size", "20px")
+                    .style("fill", "#333333")
+                    .style("opacity", 0)
+                    .transition()
+                    .duration(cfg.transitionDuration)
+                    .delay((d, i) => 500 + i * 50)
+                    .style("opacity", 1)
+                    .attr("x", (d, i) => (radius + 20) * Math.cos(angleSlice * i - Math.PI / 2))
+                    .attr("y", (d, i) => (radius + 20) * Math.sin(angleSlice * i - Math.PI / 2));
+
+                // Create the radar areas and vertices
+                const radarLine = d3.lineRadial()
+                    .curve(d3.curveLinearClosed)
+                    .radius(d => (d.value / cfg.maxValue) * radius)
+                    .angle((d, i) => i * angleSlice);
+
+                // Create radar wrapper for each month
+                radarWrapper = svg.selectAll(".radar-wrapper")
+                    .data(data)
+                    .enter()
+                    .append("g")
+                    .attr("class", "radar-wrapper")
+                    .attr("id", (d, i) => `month-${i}`)
+                    .attr("month-index", (d, i) => i)
+                    .style("opacity", 1);  // Start visible
+
+                // Draw radar areas with animation
+                radarWrapper.append("path")
+                    .attr("class", "radar-area")
+                    .attr("d", d => radarLine(d))
+                    .style("fill", (d, i) => cfg.colors[i])
+                    .style("fill-opacity", 0)
+                    .style("stroke", (d, i) => cfg.colors[i])
+                    .style("stroke-width", "2px")
+                    .style("stroke-dasharray", function () {
+                        const length = this.getTotalLength();
+                        return `${length} ${length}`;
+                    })
+                    .style("stroke-dashoffset", function () {
+                        return this.getTotalLength();
+                    })
+                    .transition()
+                    .duration(cfg.transitionDuration)
+                    .delay((d, i) => 1000 + i * 200)
+                    .style("stroke-dashoffset", 0)
+                    .transition()
+                    .duration(cfg.transitionDuration / 2)
+                    .style("fill-opacity", 0.1);
+
+                // Draw points at each data point with animation
+                radarWrapper.selectAll(".radar-point")
+                    .data(d => d)
+                    .enter()
+                    .append("circle")
+                    .attr("class", "radar-point")
+                    .attr("r", 0)
+                    .attr("cx", (d, i) => (d.value / cfg.maxValue) * radius * Math.cos(angleSlice * i - Math.PI / 2))
+                    .attr("cy", (d, i) => (d.value / cfg.maxValue) * radius * Math.sin(angleSlice * i - Math.PI / 2))
+                    .style("fill", function () {
+                        const monthIndex = parseInt(d3.select(this.parentNode).attr("month-index"));
+                        return cfg.colors[monthIndex];
+                    })
+                    .style("stroke", "#fff")
+                    .style("stroke-width", "1px")
+                    .transition()
+                    .duration(cfg.transitionDuration / 2)
+                    .delay((d, i, nodes) => {
+                        const monthIndex = parseInt(d3.select(nodes[i].parentNode).attr("month-index"));
+                        return 1500 + monthIndex * 200 + i * 50;
+                    })
+                    .attr("r", 5)
+                    .on("end", function () {
+                        // Add event listeners after animation
+                        d3.select(this)
+                            .on("mouseover", handlePointMouseOver)
+                            .on("mouseout", handlePointMouseOut)
+                            .style("cursor", "pointer");
+                    });
+
+                // Function to handle point hover
+                function handlePointMouseOver(event, d) {
+                    const element = d3.select(this);
+                    const monthIndex = parseInt(d3.select(this.parentNode).attr("month-index"));
+                    const monthName = cfg.monthNames[monthIndex];
+
+                    element
+                        .transition()
+                        .duration(200)
+                        .attr("r", 8);
+
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", 0.9);
+
+                    tooltip.html(`
+          <strong>${d.axis}</strong><br>
+          ${monthName}: ${d.value} hours<br>
+          ${getPercentage(d.value, monthlyStats[monthIndex].total)}% of total time
+        `)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 15) + "px");
+
+                    // Highlight the parent path
+                    d3.select(this.parentNode).select(".radar-area")
+                        .transition()
+                        .duration(200)
+                        .style("fill-opacity", 0.3)
+                        .style("stroke-width", "3px");
+                }
+
+                // Function to handle point mouseout
+                function handlePointMouseOut() {
+                    d3.select(this)
+                        .transition()
+                        .duration(200)
+                        .attr("r", 5);
+
+                    tooltip.transition()
+                        .duration(500)
+                        .style("opacity", 0);
+
+                    // Restore the parent path
+                    d3.select(this.parentNode).select(".radar-area")
+                        .transition()
+                        .duration(200)
+                        .style("fill-opacity", 0.1)
+                        .style("stroke-width", "2px");
+                }
+            }
+
+            // Helper function to calculate percentage
+            function getPercentage(value, total) {
+                return (value / total * 100).toFixed(1);
+            }
+
+            // Initialize the chart
+            RadarChart("#radar-chart", data);
+
+            // Add legend interactivity
+            d3.selectAll(".legend-item").on("click", function () {
+                const monthIndex = d3.select(this).attr("data-month");
+                const isActive = !d3.select(this).classed("dimmed");
+
+                // Toggle this month's visibility
+                if (isActive) {
+                    // Dim this month
+                    d3.select(this).classed("dimmed", true);
+                    d3.select(`#month-${monthIndex}`).transition().duration(300).style("opacity", 0.1);
+                } else {
+                    // Highlight this month
+                    d3.select(this).classed("dimmed", false);
+                    d3.select(`#month-${monthIndex}`).transition().duration(300).style("opacity", 1);
+
+                    // Update stats panel
+                    updateStats(parseInt(monthIndex));
+                }
+            });
+
+            // Function to update stats panel
+            function updateStats(monthIndex) {
+                const stats = monthlyStats[monthIndex];
+                const monthName = config.monthNames[monthIndex];
+                console.log(stats);
+                // Update the stats panel
+                const statsContent = document.getElementById("stats-content");
+                statsContent.innerHTML = `
+        <div class="stat-row">
+          <span class="stat-label">Month:</span>
+          <span class="stat-value highlight">${monthName}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Total Screen Time:</span>
+          <span class="stat-value">${stats.total.toFixed(2)} hours/week</span>
+        </div>
+        <div class="stat-categories">
+            ${stats.data.map(entry => `
+                <div class="stat-row">
+                    <span class="stat-label">${entry.axis}:</span>
+                    <span class="stat-value">${entry.value} hours</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+            }
+
+
+
+            // Button controls
+            document.getElementById("btn-show-all").addEventListener("click", function () {
+                // Reset all months to visible
+                d3.selectAll(".radar-wrapper").transition().duration(400).style("opacity", 1);
+                d3.selectAll(".legend-item").classed("dimmed", false);
+
+                // Highlight this button
+                d3.selectAll(".btn").classed("active", false);
+                d3.select(this).classed("active", true);
+
+                // Reset stats panel
+                document.getElementById("stats-content").innerHTML = `
+        <div class="stat-row">
+          <span class="stat-label">Select a month by double clicking on the the legend color to see detailed stats</span>
+          <span class="stat-value"></span>
+        </div>
+      `;
+            });
+
+            document.getElementById("btn-compare").addEventListener("click", function () {
+                // Set opacity to semi-transparent to allow comparison
+                d3.selectAll(".radar-wrapper").transition().duration(400).style("opacity", 0.5);
+                d3.selectAll(".legend-item").classed("dimmed", false);
+
+                // Highlight this button
+                d3.selectAll(".btn").classed("active", false);
+                d3.select(this).classed("active", true);
+
+                // Update stats panel with comparison
+                let comparisonHTML = `
+        <div class="stat-row">
+          <span class="stat-label highlight">Month-to-Month Comparison</span>
+        </div>
+      `;
+
+                // Find categories with biggest changes
+                const categories = data[0].map(d => d.axis);
+
+                categories.forEach(category => {
+                    const jan = data[0].find(d => d.axis === category).value;
+                    const feb = data[1].find(d => d.axis === category).value;
+                    const mar = data[2].find(d => d.axis === category).value;
+
+                    const janToFeb = ((feb - jan) / jan * 100).toFixed(1);
+                    const febToMar = ((mar - feb) / feb * 100).toFixed(1);
+
+                    comparisonHTML += `
+          <div class="stat-row">
+            <span class="stat-label">${category}:</span>
+            <span class="stat-value">
+              Jan: ${jan}h → Feb: ${feb}h (${janToFeb > 0 ? '+' : ''}${janToFeb}%) → 
+              Mar: ${mar}h (${febToMar > 0 ? '+' : ''}${febToMar}%)
+            </span>
+          </div>
+        `;
+                });
+
+                document.getElementById("stats-content").innerHTML = comparisonHTML;
+            });
+
+            document.getElementById("btn-animate").addEventListener("click", function () {
+                // Run the animation sequence
+                runAnimation();
+
+                // Highlight this button temporarily
+                d3.selectAll(".btn").classed("active", false);
+                d3.select(this).classed("active", true);
+                setTimeout(() => {
+                    d3.select(this).classed("active", false);
+                    d3.select("#btn-show-all").classed("active", true);
+                }, 4000);
+            });
+
+            // Animation sequence
+            function runAnimation() {
+                // Hide all months first
+                d3.selectAll(".radar-wrapper").transition().duration(300).style("opacity", 0);
+
+                // Then show them one by one with delay
+                setTimeout(() => {
+                    d3.select("#month-0").transition().duration(600).style("opacity", 1);
+                    updateStats(0);
+                }, 500);
+
+                setTimeout(() => {
+                    d3.select("#month-1").transition().duration(600).style("opacity", 1);
+                    updateStats(1);
+                }, 1500);
+
+                setTimeout(() => {
+                    d3.select("#month-2").transition().duration(600).style("opacity", 1);
+                    updateStats(2);
+                }, 2500);
+
+                // Finally, reset stats
+                setTimeout(() => {
+                    document.getElementById("stats-content").innerHTML = `
+          <div class="stat-row">
+            <span class="stat-label">Select a month by double clicking on the the legend color to see detailed stats</span>
+            <span class="stat-value"></span>
+          </div>
+        `;
+                }, 3500);
+            }
+
+            // Add window resize handler
+            window.addEventListener("resize", debounce(function () {
+                if (window.innerWidth < 768) {
+                    RadarChart("#radar-chart", data, { width: 350, height: 350 });
+                } else {
+                    RadarChart("#radar-chart", data);
+                }
+            }, 250));
+
+            // Debounce function for resize
+            function debounce(func, wait) {
+                let timeout;
+                return function () {
+                    const context = this, args = arguments;
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func.apply(context, args), wait);
+                };
+            }
+
+        });
+
+
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #111827;
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .filters {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .filter-button {
+            background: #0d9488;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .filter-button:hover {
+            background: #0f766e;
+        }
+
+        .filter-button.active {
+            background: #134e4a;
+            box-shadow: 0 0 0 2px #2dd4bf;
+        }
+
+        #heatmap {
+            background: #1f2937;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .cell {
+            fill: #1f2937;
+            stroke: #374151;
+            stroke-width: 1px;
+            transition: all 0.3s ease;
+        }
+
+        .cell:hover {
+            stroke: #fff;
+            stroke-width: 2px;
+            filter: brightness(1.2);
+        }
+
+        .axis-label {
+            fill: #9ca3af;
+            font-size: 12px;
+        }
+
+        .title {
+            fill: #fff;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            fill: #9ca3af;
+            font-size: 14px;
+        }
+
+        .legend-label {
+            fill: #9ca3af;
+            font-size: 12px;
+        }
+
+        .tick text {
+            fill: #9ca3af;
+            font-size: 12px;
+        }
+
+        .tick line {
+            stroke: #374151;
+        }
+
+        .tooltip {
+            position: absolute;
+            padding: 8px 12px;
+            background: #374151;
+            color: white;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .legend-box {
+            fill: #1f2937;
+            stroke: #374151;
+            stroke-width: 1px;
+        }
+
+        .legend-text {
+            fill: #9ca3af;
+            font-size: 12px;
+        }
+
+        #weekFilter {
+            background: #374151;
+            color: #fff;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-bottom: 1rem;
+        }
+
+        #weekFilter:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px #60a5fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="filters">
+        <select id="weekFilter">
+            <option value="all">Default Week</option>
+            <option value="1">Week 1</option>
+            <option value="2">Week 2</option>
+            <option value="3">Week 3</option>
+            <option value="4">Week 4</option>
+        </select>
+        <button class="filter-button active" data-age="10-20">10-20 years</button>
+        <button class="filter-button" data-age="20-40">20-40 years</button>
+        <button class="filter-button" data-age="40-60">40-60 years</button>
+    </div>
+    <div id="heatmap"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script>
+        // Load data from CSV file
+        d3.csv("finaldata.csv").then(data => {
+            // Parse data
+            data.forEach(d => {
+                d.Usage = +d.Usage;
+                d.Hour = +d.Hour.split('-')[0];
+                d.Day = d.Day;
+                d.Week = +d.Week;
+                d.Age = d.Age;
+            });
+
+            const Days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const Hours = Array.from({ length: 24 }, (_, i) => i);
+
+            // Set up dimensions with better padding
+            const margin = { top: 60, right: 150, bottom: 50, left: 70 };
+            const width = 1000 - margin.left - margin.right;
+            const height = 450 - margin.top - margin.bottom;
+
+            // Create tooltip
+            const tooltip = d3.select("body")
+                .append("div")
+                .attr("class", "tooltip");
+
+            // Create SVG with animation container
+            const svg = d3.select("#heatmap")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Create scales with increased padding
+            const x = d3.scaleBand()
+                .range([0, width])
+                .domain(Hours)
+                .padding(0.2);
+
+            const y = d3.scaleBand()
+                .range([height, 0])
+                .domain(Days)
+                .padding(0.15);
+
+            // Color scale with smoother transition
+            const color = d3.scaleSequential()
+                .interpolator(d3.interpolateBlues)
+                .domain([0, 60]);
+
+            // Function to update the heatmap
+            function updateHeatmap(filteredData) {
+                // Remove existing cells
+                svg.selectAll(".cell").remove();
+
+                // Add cells with enter animation
+                const cells = svg.selectAll(".cell")
+                    .data(filteredData)
+                    .enter()
+                    .append("rect")
+                    .attr("x", d => x(d.Hour))
+                    .attr("y", d => y(d.Day))
+                    .attr("width", x.bandwidth())
+                    .attr("height", y.bandwidth())
+                    .attr("class", "cell")
+                    .style("fill", "#1f2937")
+                    .style("opacity", 0);
+
+                // Add enter animation
+                cells.transition()
+                    .duration(1000)
+                    .delay((d, i) => i * 5)
+                    .style("fill", d => color(d.Usage))
+                    .style("opacity", 1);
+
+                // Add hover interactions
+                cells.on("mouseover", function (event, d) {
+                    d3.select(this)
+                        .transition()
+                        .duration(150)
+                        .style("filter", "brightness(1.2)");
+
+                    tooltip.style("opacity", 1)
+                        .html(`Age: ${d.Age}<br>Week: ${d.Week}<br>Day: ${d.Day}<br>Time: ${formatTime(d.Hour)}<br>Usage: ${d.Usage} min`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 10) + "px");
+                })
+                    .on("mouseout", function () {
+                        d3.select(this)
+                            .transition()
+                            .duration(150)
+                            .style("filter", "none");
+
+                        tooltip.style("opacity", 0);
+                    });
+            }
+
+            // Format time helper function
+            function formatTime(Hour) {
+                if (Hour === 0) return "12 AM";
+                if (Hour === 12) return "12 PM";
+                return Hour < 12 ? `${Hour} AM` : `${Hour - 12} PM`;
+            }
+
+            // Add axes with animations
+            const xAxis = svg.append("g")
+                .style("font-size", 12)
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x)
+                    .tickFormat(d => formatTime(d)));
+
+            const yAxis = svg.append("g")
+                .style("font-size", 12)
+                .call(d3.axisLeft(y));
+
+            // Animate axes
+            xAxis.style("opacity", 0)
+                .transition()
+                .duration(1000)
+                .style("opacity", 1);
+
+            yAxis.style("opacity", 0)
+                .transition()
+                .duration(1000)
+                .style("opacity", 1);
+
+            // Add title with animation
+            const title = svg.append("text")
+                .attr("class", "title")
+                .attr("x", width / 2)
+                .attr("y", -margin.top / 2)
+                .attr("text-anchor", "middle")
+                .text("Peak Usage Times by Age Group")
+                .style("opacity", 0)
+                .transition()
+                .duration(1000)
+                .style("opacity", 1);
+
+            // Add subtitle
+            svg.append("text")
+                .attr("class", "subtitle")
+                .attr("x", width / 2)
+                .attr("y", -margin.top / 2 + 25)
+                .attr("text-anchor", "middle")
+                .text("Weekly screen time patterns")
+                .style("opacity", 0)
+                .transition()
+                .duration(1000)
+                .delay(500)
+                .style("opacity", 1);
+
+            // Add color intensity legend
+            const legendGroup = svg.append("g")
+                .attr("transform", `translate(${width + 20}, 0)`);
+
+            const legendSteps = [0, 15, 30, 45, 60];
+            const legendHeight = 30;
+
+            legendGroup.selectAll("rect")
+                .data(legendSteps)
+                .enter()
+                .append("rect")
+                .attr("x", 0)
+                .attr("y", (d, i) => i * (legendHeight + 5))
+                .attr("width", 30)
+                .attr("height", legendHeight)
+                .attr("class", "legend-box")
+                .style("fill", d => color(d))
+                .style("opacity", 0)
+                .transition()
+                .duration(1000)
+                .delay(1000)
+                .style("opacity", 1);
+
+            legendGroup.selectAll("text")
+                .data(legendSteps)
+                .enter()
+                .append("text")
+                .attr("x", 40)
+                .attr("y", (d, i) => i * (legendHeight + 5) + legendHeight / 2)
+                .attr("dy", "0.35em")
+                .attr("class", "legend-text")
+                .text(d => {
+                    if (d === 0) return "0 min";
+                    if (d === 15) return "1 to 15 min";
+                    if (d === 30) return "16 to 30 min";
+                    if (d === 45) return "31 to 45 min";
+                    if (d === 60) return "46 to 60 min";
+                })
+                .style("opacity", 0)
+                .transition()
+                .duration(1000)
+                .delay(1000)
+                .style("opacity", 1);
+
+            // Add legend title
+            legendGroup.append("text")
+                .attr("class", "legend-text")
+                .attr("x", 0)
+                .attr("y", -10)
+                .text("Usage Duration")
+                .style("font-weight", "bold")
+                .style("opacity", 0)
+                .transition()
+                .duration(1000)
+                .delay(1000)
+                .style("opacity", 1);
+
+            // Filter function that combines week and age filters
+            function filterData() {
+                const selectedWeek = document.getElementById("weekFilter").value;
+                const selectedAge = document.querySelector(".filter-button.active").dataset.age;
+                
+                let filteredData = data;
+                
+                if (selectedWeek !== "all") {
+                    filteredData = filteredData.filter(d => d.Week === +selectedWeek);
+                }
+                
+                filteredData = filteredData.filter(d => d.Age === selectedAge);
+                
+                return filteredData;
+            }
+
+            // Add event listeners for filters
+            document.querySelectorAll(".filter-button").forEach(button => {
+                button.addEventListener("click", function() {
+                    // Remove active class from all buttons
+                    document.querySelectorAll(".filter-button").forEach(btn => {
+                        btn.classList.remove("active");
+                    });
+                    // Add active class to clicked button
+                    this.classList.add("active");
+                    // Update visualization
+                    updateHeatmap(filterData());
+                });
+            });
+
+            document.getElementById("weekFilter").addEventListener("change", function() {
+                updateHeatmap(filterData());
+            });
+
+            // Initial heatmap update with default filters
+            updateHeatmap(filterData());
+        });
+    </script>
+</body>
+</html>

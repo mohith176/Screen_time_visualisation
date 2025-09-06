@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Choropleth Map - Happiness & Screen Time</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    #map { margin-top: 20px; }
+    .tooltip {
+      position: absolute;
+      background: #fff;
+      padding: 5px;
+      border: 1px solid #333;
+      pointer-events: none;
+      font-size: 12px;
+    }
+    .legend {
+      position: absolute;
+      bottom: 30px;
+      left: 50px;
+      background: white;
+      padding: 10px;
+      border: 1px solid #ccc;
+      font-size: 12px;
+    }
+    .legend-bar {
+      width: 150px;
+      height: 10px;
+      display: inline-block;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <label for="ageRange">Select Age Group:</label>
+    <input type="range" id="ageRange" min="0" max="5" value="0" step="1">
+    <span id="ageLabel"></span>
+  </div>
+  <div>
+    <label><input type="radio" name="dataType" value="happiness" checked> Happiness Levels</label>
+    <label><input type="radio" name="dataType" value="screentime"> Average Screen Time</label>
+  </div>
+  <div id="map"></div>
+  <div class="tooltip" style="opacity:0;"></div>
+  
+  <!-- Legend -->
+  <div id="legend" class="legend">
+    <div id="legend-title">Happiness Levels</div>
+    <div class="legend-bar" id="legend-gradient"></div>
+    <div>
+      <span id="legend-min">2</span>
+      <span style="float:right;" id="legend-max">9</span>
+    </div>
+  </div>
+
+  <script>
+    const width = 960, height = 600;
+    const svg = d3.select("#map").append("svg").attr("width", width).attr("height", height);
+    const projection = d3.geoMercator().scale(150).translate([width / 2, height / 1.5]);
+    const path = d3.geoPath().projection(projection);
+    const ageGroups = ["Under 18", "18-24", "24-36", "36-48", "48-64", "64+"];
+    d3.select("#ageLabel").text(ageGroups[0]);
+
+    Promise.all([
+      d3.json("world.geojson"),
+      d3.csv("final_data_with_iso.csv")
+    ]).then(([geoData, csvData]) => {
+      let countryData = {};
+      csvData.forEach(row => {
+        countryData[row.ISO_A3] = row;
+      });
+      svg.selectAll("path")
+        .data(geoData.features)
+        .enter().append("path")
+        .attr("d", path)
+        .attr("fill", "#ccc")
+        .attr("stroke", "#333")
+        .on("mouseover", function(event, d) {
+          const iso = d.id;
+          const ageIndex = +d3.select("#ageRange").property("value");
+          const metric = d3.select('input[name="dataType"]:checked').node().value;
+          let dataText = "No Data";
+          if (countryData[iso]) {
+            const happiness = parseFloat(countryData[iso][`Happiness ${ageGroups[ageIndex]}`]);
+            const screentime = parseFloat(countryData[iso][`Screen Time ${ageGroups[ageIndex]}`]);
+            dataText = `<strong>${d.properties.name}</strong><br>Happiness: ${happiness}<br>Screen Time: ${screentime}`;
+          }
+          d3.select(".tooltip").html(dataText).style("left", (event.pageX + 10) + "px").style("top", (event.pageY + 10) + "px").style("opacity", 0.9);
+        })
+        .on("mouseout", () => d3.select(".tooltip").style("opacity", 0));
+
+      function updateMap() {
+        const ageIndex = +d3.select("#ageRange").property("value");
+        const metric = d3.select('input[name="dataType"]:checked').node().value;
+        let values = [];
+        Object.values(countryData).forEach(d => {
+          let val = parseFloat(d[metric === "happiness" ? `Happiness ${ageGroups[ageIndex]}` : `Screen Time ${ageGroups[ageIndex]}`]);
+          if (!isNaN(val)) values.push(val);
+        });
+        const colorScale = metric === "happiness"
+          ? d3.scaleSequential(d3.interpolateReds).domain([2, 9])
+          : d3.scaleSequential(d3.interpolateBlues).domain([0, 12]);
+        
+        svg.selectAll("path").transition().duration(500).attr("fill", d => {
+          const iso = d.id;
+          if (countryData[iso]) {
+            let val = parseFloat(countryData[iso][metric === "happiness" ? `Happiness ${ageGroups[ageIndex]}` : `Screen Time ${ageGroups[ageIndex]}`]);
+            return isNaN(val) ? "#ccc" : colorScale(val);
+          }
+          return "#ccc";
+        });
+
+        // Update Legend
+        d3.select("#legend-title").text(metric === "happiness" ? "Happiness Levels" : "Screen Time (hours)");
+        d3.select("#legend-min").text(metric === "happiness" ? "2" : "0");
+        d3.select("#legend-max").text(metric === "happiness" ? "9" : "12");
+        d3.select("#legend-gradient").style("background", metric === "happiness"
+          ? "linear-gradient(to right, #fee0d2, #de2d26)"
+          : "linear-gradient(to right, #deebf7, #3182bd)"
+        );
+      }
+
+      d3.select("#ageRange").on("input", function() {
+        d3.select("#ageLabel").text(ageGroups[this.value]);
+        updateMap();
+      });
+
+      d3.selectAll('input[name="dataType"]').on("change", updateMap);
+
+      updateMap();
+    });
+  </script>
+</body>
+</html>

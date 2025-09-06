@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        body {
+            background: #f7fafc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        #chart {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        #chart:hover {
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .slice {
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .slice:hover {
+            transform: scale(1.02);
+        }
+
+        .slice path {
+            stroke: #fff;
+            stroke-width: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .slice:hover path {
+            stroke-width: 3px;
+            filter: brightness(1.1);
+        }
+
+        .slice text {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .slice:hover text {
+            opacity: 1;
+        }
+
+        .center-text {
+            font-size: 24px;
+            font-weight: bold;
+            fill: #2D3748;
+        }
+
+        .tooltip {
+            position: absolute;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 6px;
+            font-size: 14px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="chart">
+        <h2 style="text-align: center;">APP AND DEVICE USAGE </h2>
+        <p style="text-align: center;">Hover on the slices to explore more</p>
+    </div>
+    <div class="tooltip"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script>
+        d3.csv("screen_time_3_months.csv").then(function (data) {
+            // Define the apps and their respective devices
+            const appCategories = {
+                "Laptops": ["Chrome (Productivity)", "VS Code (Development)", "Slack (Communication)"],
+                "Mobiles": ["Instagram (Social)", "WhatsApp (Communication)", "YouTube (Entertainment)"],
+                "TV": ["Netflix (Entertainment)", "Prime Video (Entertainment)", "YouTube TV (Entertainment)"],
+                "Tablets": ["Kindle (Reading)", "Safari (Productivity)", "Games (Entertainment)"]
+            };
+
+            // Initialize storage for sum and count to calculate averages
+            let aggregatedData = {};
+
+            // Process each row in the dataset
+            data.forEach(row => {
+                let device = row.Device.trim();
+                let app = row.Application.trim();
+                let weeklyHours = parseFloat(row["Weekly Hours"]) || 0;
+
+                if (appCategories[device] && appCategories[device].includes(app)) {
+                    if (!aggregatedData[device]) {
+                        aggregatedData[device] = {};
+                    }
+                    if (!aggregatedData[device][app]) {
+                        aggregatedData[device][app] = { sum: 0, count: 0 };
+                    }
+                    aggregatedData[device][app].sum += weeklyHours;
+                    aggregatedData[device][app].count += 1;
+                }
+            });
+
+            // Convert aggregated data into the Sunburst chart format
+            let processedData = { name: "Avg Weekly Screen Time", children: [] };
+
+            Object.keys(aggregatedData).forEach(device => {
+                let deviceNode = { name: device, children: [] };
+
+                Object.keys(aggregatedData[device]).forEach(app => {
+                    let avgHours = aggregatedData[device][app].sum / aggregatedData[device][app].count;
+                    deviceNode.children.push({ name: app, value: avgHours });
+                });
+
+                processedData.children.push(deviceNode);
+            });
+
+            console.log(processedData); // This will be used to feed the Sunburst chart
+
+            // Call your function to create the Sunburst chart using processedData
+            createSunburstChart(processedData);
+        });
+
+        function createSunburstChart(data) {
+            const width = 1000;
+            const height = 800;
+            const radius = Math.min(width, height) / 2.3;
+
+            const deviceColors = d3.scaleOrdinal()
+                .domain(["Laptops", "Mobiles", "TV", "Tablets"])
+                .range(["#4299E1", "#48BB78", "#ED8936", "#9F7AEA"]);
+
+            const categoryColors = d3.scaleOrdinal()
+                .domain(["Productivity", "Development", "Communication", "Social", "Entertainment", "Reading"])
+                .range(["#63B3ED", "#68D391", "#F6AD55", "#FC8181", "#B794F4", "#F687B3"]);
+
+            const svg = d3.select("#chart")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height)
+                .append("g")
+                .attr("transform", `translate(${width / 2},${height / 2})`);
+
+            const partition = d3.partition()
+                .size([2 * Math.PI, radius]);
+
+            const root = d3.hierarchy(data)
+                .sum(d => d.value || 0);
+
+            partition(root);
+
+            const arc = d3.arc()
+                .startAngle(d => d.x0)
+                .endAngle(d => d.x1)
+                .innerRadius(d => d.y0)
+                .outerRadius(d => d.y1)
+                .cornerRadius(4);
+
+            // Create tooltip
+            const tooltip = d3.select(".tooltip");
+
+            // Create slices with enter animation
+            const slice = svg.selectAll("g.slice")
+                .data(root.descendants())
+                .enter()
+                .append("g")
+                .attr("class", "slice")
+                .style("opacity", 0)
+                .transition()
+                .duration(1000)
+                .delay((d, i) => i * 100)
+                .style("opacity", 1);
+
+            // Add paths with animation
+            slice.selection().append("path")
+                .attr("d", arc)
+                .style("fill", d => {
+                    if (d.depth === 0) return "#FFFFFF";
+                    if (d.depth === 1) return deviceColors(d.data.name);
+                    const category = d.data.name.match(/\((.*?)\)/);
+                    return category ? categoryColors(category[1]) : "#CBD5E0";
+                })
+                .style("opacity", d => 1.1 - d.depth * 0.2)
+                .on("mouseover", function (event, d) {
+                    d3.select(this)
+                        .transition()
+                        .duration(300)
+                        .style("filter", "brightness(1.1)")
+                        .style("transform", "scale(1.01)");
+
+                    tooltip.style("opacity", 1)
+                        .html(`${d.data.name}<br>${d.value.toFixed(2)} hours`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 10) + "px");
+                })
+                .on("mouseout", function () {
+                    d3.select(this)
+                        .transition()
+                        .duration(300)
+                        .style("filter", "none")
+                        .style("transform", "scale(1)");
+
+                    tooltip.style("opacity", 0);
+                });
+
+            // Add labels with fade-in animation
+            slice.selection().append("text")
+                .attr("transform", d => {
+                    const [x, y] = arc.centroid(d);
+                    const angle = (d.x0 + d.x1) / 2 * 180 / Math.PI - 90;
+                    const radius = Math.sqrt(x * x + y * y);
+                    return `rotate(${angle},0,0) translate(${radius},0) ${angle > 90 ? 'rotate(180)' : ''}`;
+                })
+                .attr("text-anchor", "middle")
+                .attr("dy", ".35em")
+                .text(d => {
+                    if (d.depth === 0) return "";
+                    const name = d.data.name.replace(/\s*\([^)]*\)/, '');
+                    return (d.x1 - d.x0) > 0.1 ? name : "";
+                })
+                .style("fill", d => d.depth === 1 ? "#FFFFFF" : "#2D3748")
+                .style("font-size", d => d.depth === 1 ? "14px" : "12px")
+                .style("opacity", 0)
+                .transition()
+                .duration(1000)
+                .delay((d, i) => i * 100 + 500)
+                .style("opacity", 1);
+
+            // Add center circular image with animation
+            svg.append("defs")
+                .append("clipPath")  // Define a circular clipping path
+                .attr("id", "clip-circle")
+                .append("circle")
+                .attr("cx", 0)
+                .attr("cy", 0)
+                .attr("r", 82);  // Adjust radius as needed
+
+            svg.append("image")
+                .attr("xlink:href", "download.jpeg")  // Replace with your image URL
+                .attr("width", 175)   // Image size
+                .attr("height", 175)  // Image size
+                .attr("x", -85)  // Centering
+                .attr("y", -85)  // Centering
+                .attr("clip-path", "url(#clip-circle)")  // Apply the circular clip
+                .style("opacity", 0)
+                .transition()
+                .duration(1000)
+                .style("opacity", 1);
+
+
+            // Add subtle continuous rotation animation
+            function rotate() {
+                svg.transition()
+                    .duration(30000)
+                    .ease(d3.easeLinear)
+                    .attr("transform", `translate(${width / 2},${height / 2}) rotate(360)`)
+                    .on("end", () => {
+                        svg.attr("transform", `translate(${width / 2},${height / 2}) rotate(0)`);
+                        rotate();
+                    });
+            }
+
+            // Start rotation after initial animations
+            setTimeout(rotate, 2000);
+        }
+    </script>
+
+
+
+
+</body>
+
+</html>

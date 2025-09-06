@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualization Showcase</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            html.classList.toggle("dark");
+            localStorage.setItem("theme", html.classList.contains("dark") ? "dark" : "light");
+        }
+        
+        function showViz(vizId) {
+            document.querySelectorAll('.visualization').forEach(viz => {
+                viz.classList.remove('active');
+                viz.classList.add('hidden');
+            });
+            
+            const iframe = document.getElementById(vizId).querySelector("iframe");
+            iframe.src = iframe.src; // Reload the iframe to restart animations
+            
+            document.getElementById(vizId).classList.remove('hidden');
+            setTimeout(() => document.getElementById(vizId).classList.add('active'), 10);
+        }
+        
+        function toggleViz2() {
+            const viz2a = document.getElementById('viz2a');
+            const viz2b = document.getElementById('viz2b');
+            if (viz2a.classList.contains('hidden')) {
+                viz2a.classList.remove('hidden');
+                viz2b.classList.add('hidden');
+            } else {
+                viz2a.classList.add('hidden');
+                viz2b.classList.remove('hidden');
+            }
+        }
+
+        function toggleViz1() {
+            const viz1a = document.getElementById('viz1a');
+            const viz1b = document.getElementById('viz1b');
+            if (viz1a.classList.contains('hidden')) {
+                viz1a.classList.remove('hidden');
+                viz1b.classList.add('hidden');
+            } else {
+                viz1a.classList.add('hidden');
+                viz1b.classList.remove('hidden');
+            }
+        }
+        
+        document.addEventListener("DOMContentLoaded", () => {
+            const theme = localStorage.getItem("theme");
+            if (theme) {
+                document.documentElement.classList.add(theme);
+            }
+            showViz('viz3');
+        });
+    </script>
+    <style>
+        .light { --bg-color: #f3f4f6; --text-color: #111827; }
+        .dark { --bg-color: #111827; --text-color: #f3f4f6; }
+        .visualization {
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+        .visualization.active {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-[var(--bg-color)] text-[var(--text-color)] flex flex-col min-h-screen">
+    
+    <!-- Navbar -->
+    <nav class="bg-blue-600 text-white p-4 flex justify-between items-center shadow-md rounded-b-2xl">
+        <h1 class="text-2xl font-bold">Visualization Showcase</h1>
+        <div class="flex items-center gap-4">
+            <button onclick="showViz('viz1')" class="bg-white text-blue-600 px-4 py-2 rounded-lg shadow-md hover:bg-gray-200 transition">Viz 1</button>
+            <button onclick="showViz('viz2')" class="bg-white text-blue-600 px-4 py-2 rounded-lg shadow-md hover:bg-gray-200 transition">Viz 2</button>
+            <button onclick="showViz('viz3')" class="bg-white text-blue-600 px-4 py-2 rounded-lg shadow-md hover:bg-gray-200 transition">Viz 3</button>
+            <button onclick="toggleTheme()" class="bg-gray-800 text-white px-4 py-2 rounded-full hover:bg-gray-700 transition flex items-center">
+                <span class="mr-2">🌙</span> Toggle Mode
+            </button>
+        </div>
+    </nav>
+    
+    <!-- Main Container -->
+    <div class="container mx-auto p-2 flex-grow flex items-center justify-center">
+        
+        <!-- Visualization 1 -->
+        <section id="viz1" class="visualization bg-white p-2 rounded-3xl shadow-lg hidden w-[1000vw] h-[85vh] flex items-center justify-center">
+            <button onclick="toggleViz1()" class="mb-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-700 transition">Toggle Visualization</button>
+            <iframe id="viz1a" src="vis1a.html" class="w-full h-full border-0 rounded-3xl" allow="fullscreen; autoplay"></iframe>
+            <iframe id="viz1b" src="vis1b.html" class="w-full h-full border-0 rounded-3xl hidden" allow="fullscreen; autoplay"></iframe>        </section>
+        
+        <!-- Visualization 2 with Toggle Button -->
+        <section id="viz2" class="visualization bg-white p-2 rounded-3xl shadow-lg hidden w-[1000vw] h-[85vh] flex flex-col items-center justify-center">
+            <button onclick="toggleViz2()" class="mb-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-700 transition">Toggle Visualization</button>
+            <iframe id="viz2a" src="vis2a.html" class="w-full h-full border-0 rounded-3xl" allow="fullscreen; autoplay"></iframe>
+            <iframe id="viz2b" src="vis2b.html" class="w-full h-full border-0 rounded-3xl hidden" allow="fullscreen; autoplay"></iframe>
+        </section>
+        
+        <!-- Visualization 3 -->
+        <section id="viz3" class="visualization bg-white p-2 rounded-3xl shadow-lg hidden w-[1000vw] h-[85vh] flex items-center justify-center">
+            <iframe src="vis3.html" class="w-full h-full border-0 rounded-3xl" allow="fullscreen; autoplay"></iframe>
+        </section>
+    </div>
+    
+    <!-- Footer -->
+    <footer class="bg-blue-600 text-white text-center p-4 mt-auto rounded-t-2xl">
+        <p>&copy; 2025 Visualization Showcase | Built with D3.js & Tailwind CSS</p>
+    </footer>
+    
+</body>
+</html>
