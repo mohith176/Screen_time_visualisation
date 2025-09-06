@@ -4,7 +4,7 @@
 
 - This is a comprehensive data visualization project that analyzes global screen time patterns and their relationship with happiness levels. The project creates an interactive dashboard with multiple visualization types to explore different aspects of digital device usage across various demographics and geographic regions.
 
-
+ **[Live Demo](https://mohith176.github.io/Screen_time_visualisation/)**
 
 ## [Usage Guide](https://youtu.be/mxZurvgmbfA?feature=shared)
 
